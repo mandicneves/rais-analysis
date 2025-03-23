@@ -1,47 +1,47 @@
 # 📊 Análise da Evolução do Mercado de Trabalho por Setor no Brasil 🇧🇷
 
-Este projeto utiliza os dados da **RAIS (Relação Anual de Informações Sociais)** para analisar a evolução do emprego formal no Brasil ao longo dos anos, explorando a distribuição de empregos por setor, variação salarial e tendências econômicas regionais.  
+Este projeto utiliza os dados da **RAIS (Relação Anual de Informações Sociais)** para analisar a evolução do emprego formal no Brasil ao longo dos anos, explorando a distribuição de empregos por setor, variação salarial e tendências econômicas regionais.
 
 Os dados são acessados diretamente da plataforma [**Base dos Dados**](https://basedosdados.org/) utilizando a linguagem **R** e o pacote `basedosdados`.
 
----
+------------------------------------------------------------------------
 
-O mercado de trabalho é um dos principais indicadores da saúde econômica de um país. A criação e destruição de empregos em diferentes setores refletem mudanças estruturais na economia, avanços tecnológicos, políticas governamentais e crises econômicas.  
+O mercado de trabalho é um dos principais indicadores da saúde econômica de um país. A criação e destruição de empregos em diferentes setores refletem mudanças estruturais na economia, avanços tecnológicos, políticas governamentais e crises econômicas.
 
-Com esta análise, buscamos responder perguntas como:  
-✅ **Quais setores estão crescendo e quais estão encolhendo?**  
-✅ **Como os salários médios evoluíram ao longo do tempo?**  
-✅ **Existe desigualdade regional na geração de empregos?**  
+Com esta análise, buscamos responder perguntas como:\
+- **Quais setores estão crescendo e quais estão encolhendo?**\
+- **Como os salários médios evoluíram ao longo do tempo?**\
+- **Existe desigualdade regional na geração de empregos?**
 
----
+------------------------------------------------------------------------
 
-## 📂 Estrutura do Projeto  
+## 📂 Estrutura do Projeto
 
-- `rais.R` → Contém os códigos R utilizados na análise
-- `.keys` → Contém o `ID_PROJECT` do Google Cloud
-- `data/` → Pasta para armazenar os dados baixados (se necessário)  
-- `README.md` → Este arquivo, com a explicação detalhada do projeto  
+-   `rais.R` → Contém os códigos R utilizados na análise
+-   `.keys` → Contém o `ID_PROJECT` do Google Cloud
+-   `data/` → Pasta para armazenar os dados baixados (se necessário)
+-   `README.md` → Este arquivo, com a explicação detalhada do projeto
 
----
+------------------------------------------------------------------------
 
-## 🛠️ Configuração e Dependências  
+## 🛠️ Configuração e Dependências
 
-### **1️⃣ Instalar Pacotes Necessários**  
+### **1️⃣ Instalar Pacotes Necessários**
 
-Antes de rodar o código, instale os pacotes necessários:  
+Antes de rodar o código, instale os pacotes necessários:
 
-```r
+``` r
 install.packages("basedosdados")
 install.packages("tidyverse")
 install.packages("ggplot2")
 install.packages("sf")
 ```
 
-### **2️⃣ Autenticação no Google Cloud**  
+### **2️⃣ Autenticação no Google Cloud**
 
 Para acessar os dados da **RAIS** no `basedosdados`, é necessário configurar um projeto no Google Cloud e autenticar a API. Eu adicionei um arquivo `.keys` na pasta contendo meu `ID_PROJECT` e fiz a leitura com o código abaixo:
 
-```r
+``` r
 library(basedosdados)
 file.path(getwd(), ".keys") |> 
   readLines() |> 
@@ -49,43 +49,56 @@ file.path(getwd(), ".keys") |>
   basedosdados::set_billing_id()
 ```
 
----
+------------------------------------------------------------------------
 
-## 📊 Coleta de Dados  
+## 📊 Coleta de Dados
 
-Usamos o pacote `basedosdados` para consultar a base da RAIS e extrair informações sobre emprego e salário médio por setor e região.  
+Utilizamos o pacote `basedosdados` para consultar a base da RAIS e extrair informações sobre emprego e salário médio por setor e região.
 
-```r
+Primeiramente, estabelecemos a conexão com a tabela desejada e obtemos um vislumbre de como os dados estão organizados.
+
+Para coletar os dados de fato, podemos aplicar filtros e seleções utilizando as funções do framework `tidyverse` e, em seguida, realizar a extração com a função `bd_collect()` do pacote `basedosdados`.
+
+Alternativamente, é possível especificar uma query **SQL** diretamente para filtrar e selecionar os dados, coletando-os com a função `read_sql()`. Neste primeiro momento, optei pelo uso das funções do `tidyverse` para um tratamento mais flexível e integrado.
+
+``` r
 library(basedosdados)
 library(tidyverse)
 
-query <- "
-SELECT 
-    ano, 
-    sigla_uf, 
-    cnae_2_subclasse, 
-    vinculos_ativos, 
-    salario_mensal_med
-FROM `basedosdados.br_me_rais.microdados`
-WHERE ano BETWEEN 2010 AND 2023
-"
+# Estabelecendo conexão e visualizando a estrutura dos dados
+dados_rais <- basedosdados::bdplyr("basedosdados.br_me_rais.microdados_vinculos")
+dados_rais |> glimpse()
 
-dados_rais <- basedosdados::read_sql(query)
+# Aplicando filtros e coletando os dados
+dados_evolucao_mt <- dados_rais |> 
+  filter(
+    ano >= 2020 & ano <= 2023,
+    id_municipio == "3550308"
+  ) |> 
+  select(
+    ano,
+    cbo_2002,
+    cnae_1,
+    vinculo_ativo_3112,
+    valor_remuneracao_media_sm
+  ) |> 
+  basedosdados::bd_collect()
 ```
 
-Explicação:  
-✅ **Selecionamos os anos de 2010 a 2023** para capturar uma tendência de longo prazo  
-✅ **Filtramos por Estado (sigla_uf) e setor econômico (cnae_2_subclasse)**  
-✅ **Extraímos o número total de vínculos ativos e o salário médio mensal**  
+**Explicação:**\
+- Filtramos os anos de 2020 a 2023 para capturar uma tendência.\
+- Filtramos pela cidade de São Paulo (`id_municipio == "3550308"`).\
+- Selecionamos o número total de vínculos ativos e o salário médio mensal em salários mínimos e setor econômico (cnae_1).
 
----
+------------------------------------------------------------------------
 
-## 📈 Análise Exploratória  
+## 📈 Análise Exploratória
 
-### **📊 Evolução do emprego por setor**  
-Criamos um gráfico para visualizar a evolução do número de empregos por setor ao longo dos anos.  
+### **📊 Evolução do emprego por setor**
 
-```r
+Criamos um gráfico para visualizar a evolução do número de empregos por setor ao longo dos anos.
+
+``` r
 dados_rais %>%
   group_by(ano, cnae_2_subclasse) %>%
   summarise(total_empregos = sum(vinculos_ativos, na.rm = TRUE)) %>%
@@ -98,17 +111,17 @@ dados_rais %>%
   theme(legend.position = "none")
 ```
 
-📌 **O que podemos observar?**  
-🔹 Quais setores apresentaram maior crescimento?  
-🔹 Como crises econômicas impactaram a geração de empregos?  
+📌 **O que podemos observar?**\
+🔹 Quais setores apresentaram maior crescimento?\
+🔹 Como crises econômicas impactaram a geração de empregos?
 
----
+------------------------------------------------------------------------
 
-### **🗺️ Mapa da distribuição de empregos por estado**  
+### **🗺️ Mapa da distribuição de empregos por estado**
 
-Usamos o pacote `sf` para visualizar a distribuição regional do emprego formal.  
+Usamos o pacote `sf` para visualizar a distribuição regional do emprego formal.
 
-```r
+``` r
 library(ggplot2)
 library(sf)
 
@@ -129,34 +142,32 @@ ggplot(data = brasil) +
   theme(legend.position = "none")
 ```
 
-📌 **O que podemos observar?**  
-🔹 Quais estados concentram mais empregos?  
-🔹 Existe desigualdade regional no mercado de trabalho?  
+📌 **O que podemos observar?**\
+🔹 Quais estados concentram mais empregos?\
+🔹 Existe desigualdade regional no mercado de trabalho?
 
----
+------------------------------------------------------------------------
 
-## 🚀 Conclusões e Próximos Passos  
+## 🚀 Conclusões e Próximos Passos
 
-A partir dos gráficos e análises, podemos tirar algumas conclusões sobre o comportamento do emprego formal no Brasil.  
+A partir dos gráficos e análises, podemos tirar algumas conclusões sobre o comportamento do emprego formal no Brasil.\
+🔎 **Possíveis descobertas:**\
+- Quais setores tiveram maior expansão nos últimos anos\
+- Como eventos econômicos impactaram o mercado de trabalho\
+- Diferenças salariais entre setores
 
-🔎 **Possíveis descobertas:**  
-✅ Quais setores tiveram maior expansão nos últimos anos  
-✅ Como eventos econômicos impactaram o mercado de trabalho  
-✅ Diferenças salariais entre setores  
+💡 **Próximos passos:**\
+- Aplicar modelos estatísticos para prever tendências futuras\
+- Comparar os dados da RAIS com indicadores macroeconômicos\
+- Explorar diferenças entre pequenas e grandes empresas
 
-💡 **Próximos passos:**  
-- Aplicar modelos estatísticos para prever tendências futuras  
-- Comparar os dados da RAIS com indicadores macroeconômicos  
-- Explorar diferenças entre pequenas e grandes empresas  
+------------------------------------------------------------------------
 
----
+## 📌 Contato
 
-## 📌 Contato  
+Caso tenha dúvidas ou sugestões, fique à vontade para contribuir!
 
-Caso tenha dúvidas ou sugestões, fique à vontade para contribuir!  
+📧 **Email:** [mandicneves\@gmail.com](mailto:mandicneves@gmail.com){.email}\
+📂 **GitHub:** [github.com/mandicneves](https://github.com/mandicneves)
 
-📧 **Email:** seuemail@example.com  
-🐦 **Twitter:** @seuperfil  
-📂 **GitHub:** [github.com/seuusuario](https://github.com/seuusuario)  
-
-🛠️ **Contribuições são bem-vindas!** Caso queira colaborar, abra uma issue ou envie um pull request. 🚀  
+🛠️ **Contribuições são bem-vindas!** Caso queira colaborar, abra uma issue ou envie um pull request. 🚀
