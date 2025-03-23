@@ -6,8 +6,6 @@ Os dados são acessados diretamente da plataforma [**Base dos Dados**](https://b
 
 ---
 
-## 🏛️ Motivação Econômica  
-
 O mercado de trabalho é um dos principais indicadores da saúde econômica de um país. A criação e destruição de empregos em diferentes setores refletem mudanças estruturais na economia, avanços tecnológicos, políticas governamentais e crises econômicas.  
 
 Com esta análise, buscamos responder perguntas como:  
@@ -15,13 +13,12 @@ Com esta análise, buscamos responder perguntas como:
 ✅ **Como os salários médios evoluíram ao longo do tempo?**  
 ✅ **Existe desigualdade regional na geração de empregos?**  
 
-Essas informações são valiosas para formuladores de políticas públicas, economistas e investidores que desejam entender melhor as dinâmicas do mercado de trabalho brasileiro.  
-
 ---
 
 ## 📂 Estrutura do Projeto  
 
-- `scripts/` → Contém os códigos R utilizados na análise  
+- `rais.R` → Contém os códigos R utilizados na análise
+- `.keys` → Contém o `ID_PROJECT` do Google Cloud
 - `data/` → Pasta para armazenar os dados baixados (se necessário)  
 - `README.md` → Este arquivo, com a explicação detalhada do projeto  
 
@@ -42,11 +39,14 @@ install.packages("sf")
 
 ### **2️⃣ Autenticação no Google Cloud**  
 
-Para acessar os dados da **RAIS** no `basedosdados`, é necessário configurar um projeto no Google Cloud e autenticar a API.  
+Para acessar os dados da **RAIS** no `basedosdados`, é necessário configurar um projeto no Google Cloud e autenticar a API. Eu adicionei um arquivo `.keys` na pasta contendo meu `ID_PROJECT` e fiz a leitura com o código abaixo:
 
 ```r
 library(basedosdados)
-basedosdados::set_billing_id("seu_projeto_no_gcp")
+file.path(getwd(), ".keys") |> 
+  readLines() |> 
+  trimws() |> 
+  basedosdados::set_billing_id()
 ```
 
 ---
