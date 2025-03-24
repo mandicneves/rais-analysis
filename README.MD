@@ -89,14 +89,37 @@ tabela_funcionalismo <- dados_rais |>
     .groups = "drop"
   ) |>
   basedosdados::bd_collect()
+  
+tabela_funcionalismo <- tabela_funcionalismo |>
+  mutate(
+    tipo = recode(
+      natureza_juridica,
+      "1015" = "Executivo Federal",
+      "1023" = "Executivo Estadual",
+      "1031" = "Executivo Municipal",
+      "1040" = "Legislativo Federal",
+      "1058" = "Legislativo Estadual",
+      "1066" = "Legislativo Municipal",
+      "1074" = "Judiciário Federal",
+      "1082" = "Judiciário Estadual"
+    ),
+    poder = str_extract(
+      string = tipo,
+      pattern = "Executivo|Legislativo|Judiciário"
+    ),
+    esfera = str_extract(
+      string = tipo,
+      pattern = "Federal|Estadual|Municipal"
+    ),
+    numero_vinculos = numero_vinculos / 1e6
+  )
 ```
 
 Os principais passos da coleta de dados incluem:
 
-1.  Estabelecer conexão com a RAIS via basedosdados.
-2.  Filtrar os dados para remover registros desconhecidos.
-3.  Selecionar apenas as naturezas jurídicas do setor público.
-4.  Agregar os vínculos por estado, poder e esfera.
+1.  Filtrar os dados para remover registros desconhecidos.
+2.  Selecionar apenas as naturezas jurídicas do setor público.
+3.  Agregar os vínculos por estado, poder e esfera.
 
 ------------------------------------------------------------------------
 
@@ -108,9 +131,77 @@ Para facilitar a compreensão da evolução do funcionalismo público, são gera
 
 O gráfico de linha mostra a evolução do número de vínculos ativos entre **2020** e **2023**, diferenciando entre **Executivo, Legislativo e Judiciário**. A visualização utiliza a biblioteca `ggplot2` e o tema `fivethirtyeight`.
 
+``` r
+library(ggplot)
+library(scales)
+library(ggthemes)
+
+# grafico de linha da evolucao do funcionalismo publico ####
+tabela_funcionalismo |>
+  group_by(ano, poder, esfera) |>
+  summarise(numero_vinculos = sum(numero_vinculos, na.rm = T), .groups = "drop") |>
+  drop_na() |>
+  ggplot(aes(x = ano, y = numero_vinculos, color = poder)) +
+  geom_line(size = 1.5) +
+  facet_wrap(~esfera, scales = "free_y") + 
+  scale_y_continuous(
+    breaks = scales::breaks_extended(8),
+    labels = scales::label_comma(big.mark = ".", decimal.mark = ",")
+  ) +
+  scale_color_fivethirtyeight() +
+  theme_fivethirtyeight() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "horizontal",
+    axis.title = element_text()
+  ) +
+  labs(
+    title = "Evolução do funcionalismo público no Brasil",
+    x = NULL,
+    y = "Nº de vínculos",
+    color = NULL,
+    caption = "Dados: RAIS/Base dos Dados"
+  )
+```
+
 ### 2️⃣ Mapa de Calor - Distribuição por Estado
 
 Utilizando o pacote `geobr`, geramos um mapa de calor para visualizar a distribuição geográfica dos vínculos no funcionalismo público em **2023**. Os estados com maior concentração de servidores são destacados com diferentes gradientes de cor.
+
+``` r
+library(geobr)
+
+# grafico mapa de calor ####
+coordenadas <- geobr::read_state()
+
+tabela_funcionalismo |> 
+  filter(ano == 2023) |>
+  group_by(sigla_uf) |>
+  summarise(numero_vinculos = sum(numero_vinculos, na.rm =T), .groups = "drop") |>
+  left_join(
+    coordenadas,
+    by = c("sigla_uf" = "abbrev_state")
+  ) |>
+  ggplot(aes(fill = numero_vinculos, geometry = geom)) + 
+  geom_sf(color = "black") + 
+  scale_fill_distiller(
+    palette = "PuBu",
+    direction = 1,
+    breaks = scales::breaks_extended(6),
+    labels = scales::label_comma(big.mark = ".", decimal.mark = ",")
+  ) +
+  theme(
+    axis.text = element_blank(),
+    panel.grid.major = element_blank(),
+    legend.direction = "vertical",
+    legend.background = element_blank()
+  ) +
+  labs(
+    title = "Funcionalismo público no Brasil",
+    fill = "Nº de vínculos ativos\n(em milhões) em dez/2020",
+    caption = "Dados: RAIS/Base dos dados"
+  )
+```
 
 ------------------------------------------------------------------------
 
@@ -118,7 +209,7 @@ Utilizando o pacote `geobr`, geramos um mapa de calor para visualizar a distribu
 
 Caso tenha dúvidas ou sugestões, fique à vontade para contribuir!
 
-📧 **Email:** [mandicneves\@gmail.com](mailto:mandicneves@gmail.com){.email}\
+📧 **Email:** [mandicneves\@gmail.com](mailto:mandicneves@gmail.com)
 📂 **GitHub:** [github.com/mandicneves](https://github.com/mandicneves)
 
 🛠️ **Contribuições são bem-vindas!** Caso queira colaborar, abra uma issue ou envie um pull request. 🚀
