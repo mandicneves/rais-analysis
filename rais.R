@@ -3,6 +3,7 @@ library(basedosdados)
 library(tidyverse)
 library(scales)
 library(ggthemes)
+library(geobr)
 
 # autorizando acesso a basededados ####
 file.path(getwd(), ".keys") |> 
@@ -94,6 +95,59 @@ tabela_funcionalismo |>
     color = NULL,
     caption = "Dados: RAIS/Base dos Dados"
   )
+
+# grafico mapa de calor ####
+coordenadas <- geobr::read_state()
+
+tabela_funcionalismo |> 
+  filter(ano == 2023) |>
+  group_by(sigla_uf) |>
+  summarise(numero_vinculos = sum(numero_vinculos, na.rm =T), .groups = "drop") |>
+  left_join(
+    coordenadas,
+    by = c("sigla_uf" = "abbrev_state")
+  ) |>
+  ggplot(aes(fill = numero_vinculos, geometry = geom)) + 
+  geom_sf(color = "black") + 
+  scale_fill_distiller(
+    palette = "PuBu",
+    direction = 1,
+    breaks = scales::breaks_extended(6),
+    labels = scales::label_comma(big.mark = ".", decimal.mark = ",")
+  ) +
+  theme(
+    axis.text = element_blank(),
+    panel.grid.major = element_blank(),
+    legend.direction = "vertical",
+    legend.background = element_blank()
+  ) +
+  labs(
+    title = "Funcionalismo público no Brasil",
+    fill = "Nº de vínculos ativos\n(em milhões) em dez/2020",
+    caption = "Dados: RAIS/Base dos dados"
+  )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
