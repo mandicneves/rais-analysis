@@ -210,6 +210,7 @@ tabela_funcionalismo |>
 Caso tenha dúvidas ou sugestões, fique à vontade para contribuir!
 
 📧 **Email:** [mandicneves\@gmail.com](mailto:mandicneves@gmail.com)
+
 📂 **GitHub:** [github.com/mandicneves](https://github.com/mandicneves)
 
 🛠️ **Contribuições são bem-vindas!** Caso queira colaborar, abra uma issue ou envie um pull request. 🚀
