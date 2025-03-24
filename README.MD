@@ -1,17 +1,10 @@
-# 📊 Análise da Evolução do Mercado de Trabalho por Setor no Brasil 🇧🇷
+# 📊 Análise do Funcionalismo Público no Brasil com Dados da RAIS
 
-Este projeto utiliza os dados da **RAIS (Relação Anual de Informações Sociais)** para analisar a evolução do emprego formal no Brasil ao longo dos anos, explorando a distribuição de empregos por setor, variação salarial e tendências econômicas regionais.
+## Visão Geral
+
+Este projeto utiliza a base de dados da **RAIS (Relação Anual de Informações Sociais)**, disponibilizada pela plataforma **Base dos Dados**, para analisar a evolução do funcionalismo público no Brasil ao longo dos anos. A partir dos dados, realizamos uma análise exploratória e visualização gráfica da distribuição de vínculos empregatícios no setor público.
 
 Os dados são acessados diretamente da plataforma [**Base dos Dados**](https://basedosdados.org/) utilizando a linguagem **R** e o pacote `basedosdados`.
-
-------------------------------------------------------------------------
-
-O mercado de trabalho é um dos principais indicadores da saúde econômica de um país. A criação e destruição de empregos em diferentes setores refletem mudanças estruturais na economia, avanços tecnológicos, políticas governamentais e crises econômicas.
-
-Com esta análise, buscamos responder perguntas como:\
-- **Quais setores estão crescendo e quais estão encolhendo?**\
-- **Como os salários médios evoluíram ao longo do tempo?**\
-- **Existe desigualdade regional na geração de empregos?**
 
 ------------------------------------------------------------------------
 
@@ -34,7 +27,9 @@ Antes de rodar o código, instale os pacotes necessários:
 install.packages("basedosdados")
 install.packages("tidyverse")
 install.packages("ggplot2")
-install.packages("sf")
+install.packages("geobr")
+install.packages("ggthemes")
+install.packages("scales")
 ```
 
 ### **2️⃣ Autenticação no Google Cloud**
@@ -53,7 +48,7 @@ file.path(getwd(), ".keys") |>
 
 ## 📊 Coleta de Dados
 
-Utilizamos o pacote `basedosdados` para consultar a base da RAIS e extrair informações sobre emprego e salário médio por setor e região.
+Utilizamos o pacote `basedosdados` para consultar a base da RAIS e extrair informações sobre o quantitativo de vínculos empregatícios no setor público, categorizados por esfera de governo (Federal, Estadual e Municipal) e poder (Executivo, Legislativo e Judiciário).
 
 Primeiramente, estabelecemos a conexão com a tabela desejada e obtemos um vislumbre de como os dados estão organizados.
 
@@ -66,100 +61,56 @@ library(basedosdados)
 library(tidyverse)
 
 # Estabelecendo conexão e visualizando a estrutura dos dados
-dados_rais <- basedosdados::bdplyr("basedosdados.br_me_rais.microdados_vinculos")
-dados_rais |> glimpse()
+dados_rais <- basedosdados::bdplyr("basedosdados.br_me_rais.microdados_estabelecimentos")
+dados_rais |> 
+  glimpse()
 
-# Aplicando filtros e coletando os dados
-dados_evolucao_mt <- dados_rais |> 
-  filter(
-    ano >= 2020 & ano <= 2023,
-    id_municipio == "3550308"
-  ) |> 
+# coletando dados sobre funcionalismo publico ####
+tabela_funcionalismo <- dados_rais |> 
   select(
-    ano,
-    cbo_2002,
-    cnae_1,
-    vinculo_ativo_3112,
-    valor_remuneracao_media_sm
-  ) |> 
+    ano, 
+    sigla_uf, 
+    natureza_juridica, 
+    quantidade_vinculos_ativos
+    ) |>
+  filter(
+    sigla_uf != "IGNORADO",
+    natureza_juridica %in% c(
+      "1015", "1023", "1031", "1040", "1058", "1066", "1074", "1082"
+      )
+  ) |>
+  group_by(
+    ano, 
+    sigla_uf, 
+    natureza_juridica
+    ) |> 
+  summarise(
+    numero_vinculos = sum(quantidade_vinculos_ativos, na.rm = T),
+    .groups = "drop"
+  ) |>
   basedosdados::bd_collect()
 ```
 
-**Explicação:**\
-- Filtramos os anos de 2020 a 2023 para capturar uma tendência.\
-- Filtramos pela cidade de São Paulo (`id_municipio == "3550308"`).\
-- Selecionamos o número total de vínculos ativos e o salário médio mensal em salários mínimos e setor econômico (cnae_1).
+Os principais passos da coleta de dados incluem:
+
+1.  Estabelecer conexão com a RAIS via basedosdados.
+2.  Filtrar os dados para remover registros desconhecidos.
+3.  Selecionar apenas as naturezas jurídicas do setor público.
+4.  Agregar os vínculos por estado, poder e esfera.
 
 ------------------------------------------------------------------------
 
-## 📈 Análise Exploratória
+## 📈 Visualização de Dados
 
-### **📊 Evolução do emprego por setor**
+Para facilitar a compreensão da evolução do funcionalismo público, são gerados dois tipos de visualizações:
 
-Criamos um gráfico para visualizar a evolução do número de empregos por setor ao longo dos anos.
+### 1️⃣ Gráfico de Linha - Evolução dos Vínculos Empregatícios
 
-``` r
-dados_rais %>%
-  group_by(ano, cnae_2_subclasse) %>%
-  summarise(total_empregos = sum(vinculos_ativos, na.rm = TRUE)) %>%
-  ggplot(aes(x = ano, y = total_empregos, color = cnae_2_subclasse)) +
-  geom_line() +
-  labs(title = "Evolução do Emprego Formal por Setor",
-       x = "Ano",
-       y = "Número de Empregos") +
-  theme_minimal() +
-  theme(legend.position = "none")
-```
+O gráfico de linha mostra a evolução do número de vínculos ativos entre **2020** e **2023**, diferenciando entre **Executivo, Legislativo e Judiciário**. A visualização utiliza a biblioteca `ggplot2` e o tema `fivethirtyeight`.
 
-📌 **O que podemos observar?**\
-🔹 Quais setores apresentaram maior crescimento?\
-🔹 Como crises econômicas impactaram a geração de empregos?
+### 2️⃣ Mapa de Calor - Distribuição por Estado
 
-------------------------------------------------------------------------
-
-### **🗺️ Mapa da distribuição de empregos por estado**
-
-Usamos o pacote `sf` para visualizar a distribuição regional do emprego formal.
-
-``` r
-library(ggplot2)
-library(sf)
-
-# Carregar shapefile do Brasil
-brasil <- st_read("https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson")
-
-# Agregar empregos por estado
-emprego_estado <- dados_rais %>%
-  group_by(sigla_uf) %>%
-  summarise(total_empregos = sum(vinculos_ativos, na.rm = TRUE))
-
-# Criar mapa temático
-ggplot(data = brasil) +
-  geom_sf(aes(fill = total_empregos), data = emprego_estado) +
-  scale_fill_viridis_c() +
-  labs(title = "Distribuição do Emprego por Estado") +
-  theme_minimal() +
-  theme(legend.position = "none")
-```
-
-📌 **O que podemos observar?**\
-🔹 Quais estados concentram mais empregos?\
-🔹 Existe desigualdade regional no mercado de trabalho?
-
-------------------------------------------------------------------------
-
-## 🚀 Conclusões e Próximos Passos
-
-A partir dos gráficos e análises, podemos tirar algumas conclusões sobre o comportamento do emprego formal no Brasil.\
-🔎 **Possíveis descobertas:**\
-- Quais setores tiveram maior expansão nos últimos anos\
-- Como eventos econômicos impactaram o mercado de trabalho\
-- Diferenças salariais entre setores
-
-💡 **Próximos passos:**\
-- Aplicar modelos estatísticos para prever tendências futuras\
-- Comparar os dados da RAIS com indicadores macroeconômicos\
-- Explorar diferenças entre pequenas e grandes empresas
+Utilizando o pacote `geobr`, geramos um mapa de calor para visualizar a distribuição geográfica dos vínculos no funcionalismo público em **2023**. Os estados com maior concentração de servidores são destacados com diferentes gradientes de cor.
 
 ------------------------------------------------------------------------
 
