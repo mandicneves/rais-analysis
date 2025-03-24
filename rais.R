@@ -1,50 +1,99 @@
-# loading packages ####
+# carregando bibliotecas ####
 library(basedosdados)
 library(tidyverse)
+library(scales)
+library(ggthemes)
 
-
-# setting inital setup ####
+# autorizando acesso a basededados ####
 file.path(getwd(), ".keys") |> 
   readLines() |> 
   trimws() |> 
   basedosdados::set_billing_id()
 
-# analysis of labor market evolution by sector in sao paulo city ####
-
+# carregando dicionario dos dados e estabelecendo conexao ####
 dicionario_rais <- basedosdados::bdplyr("basedosdados.br_me_rais.dicionario") |>
   basedosdados::bd_collect()
 dicionario_rais |> glimpse()
 
-dados_rais <- basedosdados::bdplyr("basedosdados.br_me_rais.microdados_vinculos")
+dados_rais <- basedosdados::bdplyr("basedosdados.br_me_rais.microdados_estabelecimentos")
 dados_rais |> 
   glimpse()
-dados_evolucao_mt <- dados_rais |> 
-  filter(
-    ano >= 2020 & ano <= 2023,
-    id_municipio == "3550308"
-  ) |> 
+
+# coletando dados sobre funcionalismo publico ####
+tabela_funcionalismo <- dados_rais |> 
   select(
-    ano,
-    cbo_2002,
-    cnae_1,
-    vinculo_ativo_3112,
-    valor_remuneracao_media_sm
-   ) |>
+    ano, 
+    sigla_uf, 
+    natureza_juridica, 
+    quantidade_vinculos_ativos
+    ) |>
+  filter(
+    sigla_uf != "IGNORADO",
+    natureza_juridica %in% c(
+      "1015", "1023", "1031", "1040", "1058", "1066", "1074", "1082"
+      )
+  ) |>
+  group_by(
+    ano, 
+    sigla_uf, 
+    natureza_juridica
+    ) |> 
+  summarise(
+    numero_vinculos = sum(quantidade_vinculos_ativos, na.rm = T),
+    .groups = "drop"
+  ) |>
   basedosdados::bd_collect()
   
+tabela_funcionalismo <- tabela_funcionalismo |>
+  mutate(
+    tipo = recode(
+      natureza_juridica,
+      "1015" = "Executivo Federal",
+      "1023" = "Executivo Estadual",
+      "1031" = "Executivo Municipal",
+      "1040" = "Legislativo Federal",
+      "1058" = "Legislativo Estadual",
+      "1066" = "Legislativo Municipal",
+      "1074" = "Judiciário Federal",
+      "1082" = "Judiciário Estadual"
+    ),
+    poder = str_extract(
+      string = tipo,
+      pattern = "Executivo|Legislativo|Judiciário"
+    ),
+    esfera = str_extract(
+      string = tipo,
+      pattern = "Federal|Estadual|Municipal"
+    ),
+    numero_vinculos = numero_vinculos / 1e6
+  )
 
-tabela_total_empregos <- dados_evolucao_mt |>
-  group_by(ano, cnae_1) |>
-  summarise(total_empregos = sum(vinculo_ativo_3112 |> as.numeric())) |>
-  arrange(ano, desc(total_empregos))
+# grafico de linha da evolucao do funcionalismo publico ####
+tabela_funcionalismo |>
+  group_by(ano, poder, esfera) |>
+  summarise(numero_vinculos = sum(numero_vinculos, na.rm = T), .groups = "drop") |>
+  drop_na() |>
+  ggplot(aes(x = ano, y = numero_vinculos, color = poder)) +
+  geom_line(size = 1.5) +
+  facet_wrap(~esfera, scales = "free_y") + 
+  scale_y_continuous(
+    breaks = scales::breaks_extended(8),
+    labels = scales::label_comma(big.mark = ".", decimal.mark = ",")
+  ) +
+  scale_color_fivethirtyeight() +
+  theme_fivethirtyeight() +
+  theme(
+    legend.position = "bottom",
+    legend.direction = "horizontal",
+    axis.title = element_text()
+  ) +
+  labs(
+    title = "Evolução do funcionalismo público no Brasil",
+    x = NULL,
+    y = "Nº de vínculos",
+    color = NULL,
+    caption = "Dados: RAIS/Base dos Dados"
+  )
 
 
-tabela_total_empregos |>
-  # filter(total_empregos >= mean(tabela_total_empregos$total_empregos)) |>
-  ggplot(aes(x = ano, y = total_empregos, color = cnae_1)) +
-  geom_area() +
-  labs(title = "Evolução do Emprego Formal por Setor",
-       x = "Ano",
-       y = "Número de Empregos") +
-  theme_minimal() +
-  theme(legend.position = "none")
+
